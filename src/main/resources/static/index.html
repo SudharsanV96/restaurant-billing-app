@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Restaurant Billing</title>
+<style>
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background-color: #f5f5f5;
+}
+
+h2 {
+    color: #333;
+}
+
+.container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.box {
+    width: 45%;
+}
+
+.box {
+    background: white;
+    padding: 15px;
+    border-radius: 10px;
+    width: 30%;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+button {
+    margin-left: 5px;
+    padding: 5px 10px;
+    border: none;
+    background-color: #4CAF50;
+    color: white;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #45a049;
+}
+
+button:last-child {
+    background-color: #f44336;
+}
+
+button:last-child:hover {
+    background-color: #d32f2f;
+}
+
+</style>
+</head>
+<body>
+
+<h1>🍽 Restaurant Billing</h1>
+
+<div class="container">
+
+    <div class="box">
+        <h2>Menu</h2>
+        <div id="menu"></div>
+    </div>
+
+    <div class="box">
+        <h2>Cart</h2>
+        <div id="cart"></div>
+        <h3>Total: ₹<span id="total">0</span></h3>
+        <button onclick="placeOrder()">Place Order</button>
+		<button onclick="resetOrder()">New Order</button>
+    </div>
+
+    <div class="box">
+        <h2>Bill</h2>
+        <div id="bill"></div>
+    </div>
+    
+    <div class="box">
+    <h2>Order History</h2>
+    <div id="history"></div>
+</div>
+
+</div>
+
+<script>
+let cart = [];
+
+async function loadMenu() {
+    const res = await fetch('/items');
+    const items = await res.json();
+
+    let html = '';
+    items.forEach(item => {
+        html += `
+            <p>
+                ${item.name} - ₹${item.price}
+                <button onclick="addToCart(${item.id}, '${item.name}', ${item.price})">
+                    Add
+                </button>
+            </p>
+        `;
+    });
+
+    document.getElementById('menu').innerHTML = html;
+}
+
+function addToCart(id, name, price) {
+	 let existing = cart.find(item => item.id === id);
+
+	    if (existing) {
+	        existing.quantity++;
+	    } else {
+	        cart.push({ id, name, price, quantity: 1 });
+	    }
+
+	    renderCart();
+}
+
+function renderCart() {
+	 let html = '';
+	    let total = 0;
+
+	    cart.forEach((item, index) => {
+	        total += item.price * item.quantity;
+
+	        html += `
+	            <p>
+	                ${item.name} 
+	                <button onclick="decreaseQty(${index})">-</button>
+	                ${item.quantity}
+	                <button onclick="increaseQty(${index})">+</button>
+	                <button onclick="removeItem(${index})">❌</button>
+	            </p>
+	        `;
+	    });
+
+	    document.getElementById('cart').innerHTML = html;
+	    document.getElementById('total').innerText = total;
+}
+
+function resetOrder() {
+    cart = [];
+    renderCart();
+
+    document.getElementById('bill').innerHTML = '';
+}
+
+function removeItem(index) {
+    cart.splice(index, 1);
+    renderCart();
+}
+
+function increaseQty(index) {
+    cart[index].quantity++;
+    renderCart();
+}
+
+function decreaseQty(index) {
+    cart[index].quantity--;
+
+    if (cart[index].quantity <= 0) {
+        cart.splice(index, 1);
+    }
+
+    renderCart();
+}
+
+async function placeOrder() {
+	const orderData = cart.map(item => ({
+        item: { id: item.id },
+        quantity: item.quantity
+    }));
+
+    const res = await fetch('/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderData)
+    });
+
+    const data = await res.json();
+
+    showBill(data.id); // 👈 call bill API
+
+    cart = [];
+    renderCart();
+    loadOrderHistory();
+}
+
+async function showBill(orderId) {
+
+    const res = await fetch(`/orders/${orderId}/bill`);
+    const bill = await res.json();
+
+    let html = `<h3>Order ID: ${bill.orderId}</h3>`;
+
+    bill.items.forEach(item => {
+        html += `
+            <p>
+                ${item.name} x ${item.quantity} = ₹${item.price * item.quantity}
+            </p>
+        `;
+    });
+
+    html += `<h3>Total: ₹${bill.total}</h3>`;
+
+    document.getElementById('bill').innerHTML = html;
+}
+
+async function loadOrderHistory() {
+
+    const res = await fetch('/orders');
+    const orders = await res.json();
+
+    let html = '';
+
+    orders.forEach(order => {
+        html += `
+            <p>
+                Order #${order.id} - ₹${order.totalAmount}
+                <button onclick="showBill(${order.id})">View</button>
+            </p>
+        `;
+    });
+
+    document.getElementById('history').innerHTML = html;
+}
+
+loadMenu();
+loadOrderHistory();
+</script>
+
+</body>
+</html>
