@@ -8,7 +8,7 @@ WORKDIR /app
 COPY . .
 
 # Give permission and build project
-RUN chmod +x mvnw && ./mvnw clean install
+RUN chmod +x mvnw && ./mvnw clean install -DskipTests
 
 # Expose port (Render uses 8080)
 EXPOSE 8080
